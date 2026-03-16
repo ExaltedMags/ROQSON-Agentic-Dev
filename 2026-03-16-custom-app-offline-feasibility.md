@@ -15,6 +15,8 @@ A full feasibility analysis was completed and exported. The session covered two 
 
 **All work is complete for this session.** No scripts were modified. No DocTypes were changed. The only output was a documentation file.
 
+The migration has been approved by the team. A development freeze is in effect — no changes to the live ERPNext instance until migration is complete and stable.
+
 ---
 
 ## Work Completed This Session
@@ -41,7 +43,7 @@ Used the Frappe REST API (via `roqson.py`) to fetch and summarize the current cu
 - Data continuity analysis for production DocTypes
 - Frappe Cloud rollback procedures
 - Offline PWA feasibility verdict + architecture
-- 6-month phased migration plan with checklists
+- Phased migration plan with checklists
 
 ---
 
@@ -58,12 +60,8 @@ Used the Frappe REST API (via `roqson.py`) to fetch and summarize the current cu
 - **"Trip Ticket"** in docs/comments = `Trips` in the live database (DocType name)
 - This matters: server scripts reference `reference_doctype = "Trips"`, not "Trip Ticket"
 
-### Hosting Tier — UNCONFIRMED
-**Critical unresolved item**: Whether the current $25/mo Frappe Cloud plan is:
-- **Shared Hosting** → no custom app install possible
-- **Private Bench** → custom app install via dashboard UI
-
-The entire Phase 1 plan (custom app) depends on this being a Private Bench. **Must verify in Frappe Cloud dashboard before proceeding.**
+### Hosting Tier — CONFIRMED ✅
+The site is on **ROQSON-private-bench**, $25/mo plan. Custom app installation via the Frappe Cloud dashboard is supported. This is unblocked — no upgrade needed.
 
 ### Frappe-Specific Gotchas Discovered
 1. **Fixture `modified` timestamp**: Fixtures are silently skipped if their `modified` field ≤ DB record's `modified`. Always bump to current datetime ISO before any fixture install.
@@ -74,26 +72,22 @@ The entire Phase 1 plan (custom app) depends on this being a Private Bench. **Mu
 
 ## Immediate Next Steps (Priority Order)
 
-1. **Verify Frappe Cloud hosting tier** (5 min)
-   - Log into Frappe Cloud dashboard
-   - Check if you see a "Bench" sidebar item with an "Apps" tab that allows adding from GitHub
-   - If yes → Private Bench, Phase 1 is unblocked
-   - If no → must upgrade tier before any custom app work
+1. **Scaffold `roqson_core` app** — create a private GitHub repo, then either:
+   - Run `frappe new-app roqson_core` locally (requires local bench), OR
+   - Use the [Frappe app template](https://github.com/frappe/frappe_app_template) on GitHub to create the skeleton without a local bench
+   - Push the skeleton to the GitHub repo
 
-2. **Review `FEASIBILITY_ANALYSIS.md`** for stakeholder sign-off
-   - Particularly the "Recommendation" and "Recommended Sequence" sections
-   - Confirm 6-month phased approach is acceptable scope
+2. **Create staging site on Frappe Cloud** — restore from the latest production backup via the Frappe Cloud dashboard. All phase testing happens here before touching production.
 
-3. **If Phase 1 approved — start scaffold**:
-   - Create GitHub repo for `roqson_core` app
-   - Run `frappe new-app roqson_core` locally (requires Frappe bench installed locally for scaffolding only)
-   - OR: use the [Frappe app template](https://github.com/frappe/frappe_app_template) on GitHub to create the skeleton without a local bench
+3. **Phase 1 migration (low risk)** — port all active API Server Scripts to `roqson_core/api.py`. Export Custom Fields and Print Formats as fixtures. Test on staging, then deploy. Update all Client Scripts referencing old API paths in the same deployment window.
 
-4. **If offline PWA approved — start immediately** (no custom app required):
-   - Create a Frappe Page DocType via web UI
-   - Build HTML/JS Trip Ticket companion app
-   - Use existing `roqson.py` auth pattern (token header) for API calls
-   - IndexedDB + service worker for offline caching
+4. **Phase 2 migration (medium risk)** — DocType event scripts move into the app, one DocType at a time. Start with the simplest (Receipt) and end with the most complex (Order Form, Trips).
+
+5. **Phase 3 migration (high risk)** — DocType and Workflow fixtures. Only after Phase 2 is stable and staging validation passes. Zero changes to workflow state names — orphaning is hard to recover from.
+
+6. **Bug resolution** — fix anything the migration broke. Development freeze lifts after this step.
+
+> **At each phase boundary:** staging test → manual backup → production deploy → verify.
 
 ---
 
@@ -101,11 +95,13 @@ The entire Phase 1 plan (custom app) depends on this being a Private Bench. **Mu
 
 | Decision | Rationale |
 |---|---|
+| **Migration approved, development freeze in effect** | All changes to the live ERPNext instance are paused until migration is complete and stable. |
 | **Don't migrate all 59 DocTypes at once** | Fixture conflicts, workflow orphaning, data loss risk too high. Phase in low-risk items first. |
 | **Migrate API Server Scripts first** (Phase 1) | Lowest risk (stateless, no events, easy to test). Biggest gain (proper Python, imports, f-strings). |
 | **Leave Workflows alone until staging bench** | 4 active workflows have production documents. Orphaned workflow states are hard to recover from. |
-| **Start PWA as Frappe Page (no custom app)** | Eliminates CORS, no hosting tier dependency, can start immediately. Upgrade to proper SPA later. |
-| **Report confirmed CORS requires config** | Cross-origin PWA will hit CORS errors on Authorization header requests. Same-origin via Frappe Page avoids this entirely. |
+| **Offline features are post-migration** | Offline work starts only after the system is confirmed stable on `roqson_core`. Not a parallel track. |
+| **Start PWA as Frappe Page if needed pre-migration** | Eliminates CORS, no hosting tier dependency. Upgrade to proper SPA after migration if required. |
+| **CORS requires config for cross-origin PWA** | Cross-origin PWA will hit CORS errors on Authorization header requests. Same-origin via Frappe Page avoids this entirely. |
 
 ---
 
@@ -136,32 +132,60 @@ doc = roqson.get_doc('Server Script', 'Script Name Here')
 roqson.safe_update_script('Server Script', 'Script Name', new_code)
 ```
 
-### RestrictedPython Rules (Server Scripts)
+### RestrictedPython Rules (Server Scripts — current state, pre-migration)
 - No f-strings → use string concatenation
 - No `.format()` → use `+` and `str()`
 - Generators can't close over outer-scope vars → use `for` loops
 - Only `json` is importable in the sandbox
 - API scripts return via `frappe.response['message'] = ...`
 
+### App Python Rules (post-migration — restrictions lifted)
+- f-strings work
+- `import` works — full stdlib and third-party packages available
+- Generators and comprehensions work normally
+- Doc event handlers: `def before_save(doc, method):` pattern
+- API endpoints: `@frappe.whitelist()` decorator on functions in `api.py`
+- Endpoint path changes from `frappe.handler.run_server_script` to `roqson_core.api.<function_name>`
+
 ---
 
 ## Potential Gotchas for Next Session
 
-1. **Fixture silent skip**: If you try to install a fixture and nothing changes, check the `modified` timestamp. Bump it to current datetime.
-2. **Client Script endpoint paths**: If you migrate API Server Scripts to app Python, ALL Client Scripts referencing those endpoints will break unless you update their `/api/method/` calls in sync.
-3. **`Trips` vs `Trip Ticket`**: The Frappe Cloud DocType name is `Trips`. The Server Script `reference_doctype` is also `Trips`. The CLAUDE.md and roqson.py `CUSTOM_DOCTYPES` list uses "Trip Ticket" — this is a naming inconsistency that existed before this session.
+1. **Fixture silent skip**: If you install a fixture and nothing changes, check the `modified` timestamp. Bump it to current datetime ISO format.
+2. **Client Script endpoint paths**: Migrating API Server Scripts to app Python changes all `/api/method/` paths. ALL Client Scripts referencing those endpoints break unless updated in the same deployment window.
+3. **`Trips` vs `Trip Ticket`**: The Frappe Cloud DocType name is `Trips`. The Server Script `reference_doctype` is also `Trips`. The CLAUDE.md and roqson.py `CUSTOM_DOCTYPES` list uses "Trip Ticket" — this naming inconsistency existed before this session.
 4. **Disabled scripts**: ~50+ Client Scripts and ~30 Server Scripts are disabled. Do NOT migrate disabled scripts — they are dead code.
-5. **Private Bench dependency**: The entire custom app Phase 1 is blocked if hosting is Shared Hosting. Check this first.
+5. **Workflow state names**: Do not rename any workflow state during the migration. Even a capitalization change will orphan existing documents, which requires manual SQL recovery.
+6. **Manual backup before every production deploy**: Frappe Cloud auto-backups are daily. If a deploy breaks something on day 1, the latest auto-backup is from day 0 — you lose a day of data. Always take a manual backup immediately before each phase deploy.
 
 ---
 
-## What Was NOT Done (Out of Scope)
+## What Was NOT Done (Out of Scope This Session)
 
 - No scripts were modified or deployed
 - No DocTypes were changed
 - No migration was started
 - No custom app was created
 - The feasibility analysis is purely advisory — no changes to the live instance
+
+---
+
+## Pending Work
+
+- [ ] Scaffold `roqson_core` app skeleton (GitHub repo + `frappe new-app` or template)
+- [ ] Create staging site from production backup on Frappe Cloud
+- [ ] Phase 1: Audit and list all active API Server Scripts to port
+- [ ] Phase 1: Port API scripts → `roqson_core/api.py`
+- [ ] Phase 1: Export Custom Fields as fixtures
+- [ ] Phase 1: Export Print Formats as fixtures
+- [ ] Phase 1: Update all Client Scripts referencing old API paths
+- [ ] Phase 1: Staging test → backup → production deploy → verify
+- [ ] Phase 2: Port DocType event scripts (Receipt → Customer Info → Credit App → Sales → Trips → Order Form)
+- [ ] Phase 2: Staging test → backup → production deploy → verify per DocType
+- [ ] Phase 3: DocType fixtures (staging validation required, zero field renames)
+- [ ] Phase 3: Workflow fixtures (zero state name changes, staging test first)
+- [ ] Phase 3: Production deploy → verify all workflow states intact on existing documents
+- [ ] Bug resolution → lift development freeze
 
 ---
 
@@ -176,14 +200,4 @@ roqson.safe_update_script('Server Script', 'Script Name', new_code)
 
 ---
 
-## Pending Work
-
-- [ ] Confirm Frappe Cloud hosting tier (Private Bench vs Shared Hosting)
-- [ ] Review + approve `FEASIBILITY_ANALYSIS.md` with stakeholders
-- [ ] Decide: proceed with Phase 1 custom app, or Phase 0 offline PWA (or both in parallel)
-- [ ] If Phase 1: create GitHub repo, scaffold `roqson_core` app skeleton
-- [ ] If PWA: create Frappe Page DocType for Trip Ticket companion app
-
----
-
-**Handoff Quality**: High — entire session was research/documentation with no partial code changes. Next agent can pick up any of the "Immediate Next Steps" without needing further context from this session.
+**Handoff Quality**: High — entire session was research/documentation with no partial code changes. Next agent can pick up directly from "Immediate Next Steps" step 1 without needing further context from this session.
