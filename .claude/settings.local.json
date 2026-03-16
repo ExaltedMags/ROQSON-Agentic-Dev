@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "WebFetch(domain:github.com)",
+      "Edit",
+      "Bash",
+      "mcp__claude_ai_Notion__notion-fetch"
+    ]
+  }
+}

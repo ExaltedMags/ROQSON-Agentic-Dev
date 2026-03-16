@@ -1,0 +1,109 @@
+## Context
+
+Order and Sales statuses need to be updated to reflect how ROQSON actually operates. Currently, the Order has delivery-related statuses (Delivery Completed, Delivery Failed) that belong on Sales instead. Sales also needs a proper set of dispatch and delivery statuses using ROQSON's own terminology.
+
+This ticket also clarifies bidirectional cancellation — either an Order or a Sales record can be cancelled, and each cancels the other.
+
+---
+
+## Changes to Order Statuses
+
+Remove **Delivery Completed** and **Delivery Failed** from the Order status flow. Orders should end at **Approved** or **Cancelled** — delivery outcomes are tracked on the Sales record instead.
+
+| Status | Description |
+| --- | --- |
+| Draft | Order created, not yet submitted |
+| Needs Review | Triggered by a price change — requires review before approval |
+| Approved | Order confirmed — auto-triggers stock reservation and Sales creation |
+| Cancelled | Terminated at any stage |
+
+---
+
+## Changes to Sales Statuses
+
+Replace the existing Sales statuses with ROQSON's operational terminology. Statuses apply differently depending on the Order's **Fulfillment Type** (Delivery or Pick-up):
+
+| Status | Description | Delivery | Pick-up |
+| --- | --- | --- | --- |
+| Pending | Sales record created, ready for next action | ✅ | ✅ |
+| Dispatching | Trip Ticket has been created for this Sale | ✅ | ❌ skipped |
+| In Transit | Driver is on the way — requires Google Geolocation API | ✅ | ❌ skipped |
+| Received | Delivery completed / customer picked up at warehouse | ✅ | ✅ triggered by Warehouse |
+| Failed | Delivery failed or flagged for re-delivery | ✅ | ❌ not applicable |
+| Completed | Sale fully paid — outstanding balance reached zero (see Receipts & Collections epic) | ✅ | ✅ |
+| Cancelled | Terminated — see cancellation rules below | ✅ | ✅ |
+
+> ⚠️ **In Transit** and **Received** depend on the Google Geolocation API being implemented. Flag these two statuses as blocked until that integration is live.
+> 
+
+> ⚠️ **Pick-up orders** skip Dispatching, In Transit, and Failed entirely. Received is triggered manually by Warehouse when the customer collects. See: "Add pick-up option to Order and handle stock and status flow accordingly".
+> 
+
+---
+
+## Bidirectional Cancellation Rules
+
+Either document can trigger cancellation, and it cascades to the other:
+
+**If an Order is cancelled:**
+
+- If a linked Sales record exists, warn the user: *"This order has a linked Sales record (SAL-XXXX). Cancelling this order will also cancel the Sales record. Proceed?"*
+- On confirmation: linked Sales is marked Cancelled
+- On rejection: Order cancellation is aborted
+
+**If a Sales record is cancelled:**
+
+- Warn the user: *"Cancelling this Sales record will also cancel the linked Order (Order-XXXX). Proceed?"*
+- On confirmation: linked Order is marked Cancelled
+- On rejection: Sales cancellation is aborted
+
+> Only **Sales role** and **Admin** can cancel a Sales record directly. Accounting cannot.
+> 
+
+---
+
+## Role Permissions
+
+| Action | Sales | Admin | Accounting | Dispatch | DSP | Driver |
+| --- | --- | --- | --- | --- | --- | --- |
+| Cancel Order | Yes | Yes | No | No | No | No |
+| Cancel Sales | Yes | Yes | No | No | No | No |
+| View Order statuses | Yes | Yes | Yes | Yes | Yes | No |
+| View Sales statuses | Yes | Yes | Yes | Yes | No | No |
+
+---
+
+## Notes
+
+- Coordinate with the Sales DocType epic to ensure status field options are updated consistently
+- In Transit and Received statuses should be built but hidden/disabled until Geolocation API is ready
+- The Completed status on Sales is driven by the Receipts & Collections module — do not hardcode a manual trigger for this
+
+## What Gemini said it has implemented currently:
+
+Currently, the Sales record's status moves automatically based on the lifecycle of the Trip Ticket, so you don't have
+to set them manually at every step. Here is how the flow works now:
+
+The Automated Flow:
+
+1. Pending: The Sales record starts here automatically when an Order is Approved.
+2. Dispatching: This status is set automatically as soon as you save a Trip Ticket that includes this Sales record.
+The system validates that only Pending sales can be added to a new Trip Ticket.
+3. In Transit: This status is set automatically when the Driver (or Admin) clicks the action to move the Trip Ticket
+into the "In Transit" workflow state.
+4. Received / Failed: These are set automatically based on the outcome of the delivery recorded on the Trip Ticket:
+    - If the Trip Ticket delivery_status is marked Successful, all linked Sales records move to Received.
+    - If the Trip Ticket delivery_status is marked Failed, all linked Sales records move to Failed.
+5. Completed: This is the only state that requires a manual trigger from the Accounting/Finance team. It can only be
+set once the outstanding balance is zero and at least one receipt is attached.
+
+Summary of Backend Updates:
+
+- Enforce Eligibility: Updated to allow only Pending Sales records to be dispatched.
+- Eligible Orders by Outlet: Updated the lookup tool to only show Pending records for selection.
+- Trip Ticket Transit Update: Created a new automation that hooks the Trip Ticket workflow to the Sales status.
+- Delivery Status Notification: Refactored to ensure that finishing a Trip Ticket correctly cascades the final
+operational status to the Sales record.
+
+So, while you can technically change the dropdown manually if you have the Sales or Admin role, the system is now
+designed to handle the "heavy lifting" of the status flow for you as the physical delivery progresses
