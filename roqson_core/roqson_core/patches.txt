@@ -1,0 +1,2 @@
+# Data migration patches go here if field renames are required in Phase 8.
+# Format: roqson_core.patches.<module_name>.<function_name>

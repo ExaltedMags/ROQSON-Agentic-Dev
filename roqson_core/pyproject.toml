@@ -1,0 +1,35 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "roqson_core"
+version = "0.0.1"
+description = "ROQSON Industrial Sales core customizations"
+authors = [
+    {name = "ROQSON", email = "support@roqson.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = [
+    "frappe>=15.0.0",
+]
+keywords = ["frappe", "roqson", "erp", "industrial-sales"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: Frappe",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Internet :: WWW/HTTP",
+]
+
+[project.urls]
+Homepage = "https://github.com/ExaltedMags/roqson-core"
+Repository = "https://github.com/ExaltedMags/roqson-core"
+Documentation = "https://github.com/ExaltedMags/roqson-core"
+"Bug Tracker" = "https://github.com/ExaltedMags/roqson-core/issues"

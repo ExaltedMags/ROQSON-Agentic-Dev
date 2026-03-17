@@ -1,0 +1,1 @@
+recursive-include roqson_core *.json *.js *.css *.html *.py *.txt
