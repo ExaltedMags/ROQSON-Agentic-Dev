@@ -5,10 +5,25 @@ app_description = "ROQSON Industrial Sales core customizations"
 app_version = "0.0.1"
 app_license = "MIT"
 
-# Fixtures — populated in Phase 4 (Custom Fields + Print Formats)
-#            Phase 8 (DocType JSON)
-#            Phase 9 (Workflow JSON)
-fixtures = []
+# Fixtures — Phase 4: Custom Fields + Print Formats
+#            Phase 8: DocType JSON
+#            Phase 9: Workflow JSON
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [["dt", "in", [
+            "Trips", "Address", "Vehicle", "Vehicles", "Driver",
+            "Print Settings", "Order Form", "Sales", "Promos", "Contact",
+            "Communication", "Credit Application", "Email Account", "Territory",
+        ]]]
+    },
+    {
+        "dt": "Print Format",
+        "filters": [["name", "in", ["Sales Billing Statement", "Billing Statement"]]]
+    },
+    # Phase 8: DocType fixtures added here
+    # Phase 9: Workflow fixtures added here
+]
 
 # DocType event hooks — populated in Phase 5
 # Target state (from ARCHITECTURE.md):
@@ -63,7 +78,56 @@ fixtures = []
 #         "on_update_after_submit":  "roqson_core.inventory_ledger.on_update_after_submit",
 #     },
 # }
-doc_events = {}
+doc_events = {
+    "Receipt": {
+        "before_cancel": "roqson_core.receipt.before_cancel",
+        "on_submit":     "roqson_core.receipt.on_submit",
+    },
+    "Cost Tier": {
+        "before_save": "roqson_core.cost_tier.before_save",
+    },
+    "Price Change Request": {
+        "after_save": "roqson_core.price_change_request.after_save",
+    },
+    "Inventory Entry": {
+        "after_insert": "roqson_core.inventory_entry.after_insert",
+    },
+    "Inventory Ledger": {
+        "before_insert":          "roqson_core.inventory_ledger.before_insert",
+        "after_insert":           "roqson_core.inventory_ledger.after_insert",
+        "on_update_after_submit": "roqson_core.inventory_ledger.on_update_after_submit",
+    },
+    "Sales": {
+        "before_save": "roqson_core.sales.before_save",
+        "after_save":  "roqson_core.sales.after_save",
+    },
+    "Customer Information": {
+        "before_save":            "roqson_core.customer_information.before_save",
+        "on_update_after_submit": "roqson_core.customer_information.on_update_after_submit",
+    },
+    "Order Form": {
+        "before_delete":          "roqson_core.order_form.before_delete",
+        "before_save":            "roqson_core.order_form.before_save",
+        "before_submit":          "roqson_core.order_form.before_submit",
+        "after_save":             "roqson_core.order_form.after_save",
+        "on_update_after_submit": "roqson_core.order_form.on_update_after_submit",
+        "on_submit":              "roqson_core.order_form.on_submit",
+        "on_cancel":              "roqson_core.order_form.on_cancel",
+    },
+    "Trips": {
+        "before_insert":   "roqson_core.trips.before_insert",
+        "before_validate": "roqson_core.trips.before_validate",
+        "before_save":     "roqson_core.trips.before_save",
+        "after_insert":    "roqson_core.trips.after_insert",
+        "after_save":      "roqson_core.trips.after_save",
+    },
+    "Credit Application": {
+        "before_save":            "roqson_core.credit_application.before_save",
+        "before_submit":          "roqson_core.credit_application.before_submit",
+        "after_save":             "roqson_core.credit_application.after_save",
+        "on_update_after_submit": "roqson_core.credit_application.on_update_after_submit",
+    },
+}
 
 # Permission query conditions — populated in Phase 6
 # Target state (from ARCHITECTURE.md):

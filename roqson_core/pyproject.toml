@@ -1,6 +1,6 @@
 [build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "roqson_core"
@@ -33,3 +33,7 @@ Homepage = "https://github.com/ExaltedMags/roqson-core"
 Repository = "https://github.com/ExaltedMags/roqson-core"
 Documentation = "https://github.com/ExaltedMags/roqson-core"
 "Bug Tracker" = "https://github.com/ExaltedMags/roqson-core/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["roqson_core*"]
